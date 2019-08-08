@@ -10,6 +10,6 @@ pub mod schedule;
 pub mod prometheus_metrics;
 
 fn main() {
-    schedule::repeat(Duration::from_secs(60), prometheus_metrics::set_metrics);
+    schedule::repeat(Duration::from_secs(120), prometheus_metrics::set_metrics);
     rocket::ignite().mount("/", routes![prometheus_metrics::endpoint]).launch();
 }

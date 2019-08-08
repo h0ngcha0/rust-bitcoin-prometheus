@@ -39,7 +39,12 @@ pub struct BlockCypherBitcoinChainResponse {
 }
 
 pub fn set_metrics() -> () {
-    let body: BlockCypherBitcoinChainResponse = reqwest::get("https://api.blockcypher.com/v1/btc/main")
+    let body: BlockCypherBitcoinChainResponse = reqwest::Client::builder()
+        .danger_accept_invalid_certs(true)
+        .build()
+        .unwrap()
+        .get("https://api.blockcypher.com/v1/btc/main")
+        .send()
         .unwrap()
         .json()
         .unwrap();

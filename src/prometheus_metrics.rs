@@ -8,6 +8,19 @@ lazy_static! {
         "unconfirmed_count_gauge",
         "Number of unconfirmed transaction in memory pool"
     ).unwrap();
+
+    pub static ref LOW_FEE_PER_KB: IntGauge = register_int_gauge!(
+        "bitcoin_low_fee_per_kb",
+        concat!(
+            "A rolling average of the fee (in satoshis) paid per kilobyte for ",
+            "transactions to be confirmed in 7 or more blocks"
+        )
+    ).unwrap();
+
+    pub static ref HEIGHT: IntGauge = register_int_gauge!(
+        "bitcoin_block_height",
+        "The current height of the blockchain; i.e., the number of blocks in the blockchain"
+    ).unwrap();
 }
 
 #[get("/metrics")]
@@ -39,7 +52,7 @@ pub struct BlockCypherBitcoinChainResponse {
 }
 
 pub fn set_metrics() -> () {
-    let body: BlockCypherBitcoinChainResponse = reqwest::Client::builder()
+    let response: BlockCypherBitcoinChainResponse = reqwest::Client::builder()
         .danger_accept_invalid_certs(true)
         .build()
         .unwrap()
@@ -49,6 +62,9 @@ pub fn set_metrics() -> () {
         .json()
         .unwrap();
 
-    info!("{:?}", body);
-    UNCONFIRMED_COUNT_GAUGE.set(body.unconfirmed_count as i64);
+    info!("{:?}", response);
+
+    UNCONFIRMED_COUNT_GAUGE.set(response.unconfirmed_count as i64);
+    LOW_FEE_PER_KB.set(response.low_fee_per_kb as i64);
+    HEIGHT.set(response.height as i64);
 }

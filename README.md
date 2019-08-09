@@ -1,10 +1,14 @@
 # Prometheus exporter for Bitcoin in Rust
 
-Run `./build` under the root directory to build docker image.
+Run `scripts/build` to build docker image.
 
 # Metrics
 
+## Bitcoin price in USD
+
 ## Number of unconfirmed transactions
+
+## Block height
 
 ## Amounts moved
 

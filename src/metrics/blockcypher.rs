@@ -1,7 +1,7 @@
-use log::info;
-use prometheus::{TextEncoder, Encoder, IntGauge};
+use prometheus::IntGauge;
 use serde::{Serialize, Deserialize};
 use chrono::{DateTime, Utc};
+use log::info;
 
 lazy_static! {
     pub static ref UNCONFIRMED_COUNT_GAUGE: IntGauge = register_int_gauge!(
@@ -23,18 +23,6 @@ lazy_static! {
     ).unwrap();
 }
 
-#[get("/metrics")]
-pub fn endpoint() -> String {
-    // Gather metrics from the default registry.
-    let mut buffer = vec![];
-    let encoder = TextEncoder::new();
-    let metric_families = prometheus::gather();
-    encoder.encode(&metric_families, &mut buffer).unwrap();
-
-    let result = String::from_utf8(buffer).unwrap();
-    return result;
-}
-
 #[derive(Serialize, Deserialize, Debug)]
 pub struct BlockCypherBitcoinChainResponse {
     pub name: String,
@@ -51,20 +39,24 @@ pub struct BlockCypherBitcoinChainResponse {
     pub last_fork_height: u32
 }
 
-pub fn set_metrics() -> () {
-    let response: BlockCypherBitcoinChainResponse = reqwest::Client::builder()
-        .danger_accept_invalid_certs(true)
-        .build()
-        .unwrap()
-        .get("https://api.blockcypher.com/v1/btc/main")
-        .send()
-        .unwrap()
-        .json()
-        .unwrap();
+pub struct BitcoinChainGeneralInfo {}
 
-    info!("{:?}", response);
+impl super::PrometheusMetrics for BitcoinChainGeneralInfo {
+    fn set_metrics(&self) -> () {
+        let response: BlockCypherBitcoinChainResponse = reqwest::Client::builder()
+            .danger_accept_invalid_certs(true)
+            .build()
+            .unwrap()
+            .get("https://api.blockcypher.com/v1/btc/main")
+            .send()
+            .unwrap()
+            .json()
+            .unwrap();
 
-    UNCONFIRMED_COUNT_GAUGE.set(response.unconfirmed_count as i64);
-    LOW_FEE_PER_KB.set(response.low_fee_per_kb as i64);
-    HEIGHT.set(response.height as i64);
+        info!("BlockCypher response {:?}", response);
+
+        UNCONFIRMED_COUNT_GAUGE.set(response.unconfirmed_count as i64);
+        LOW_FEE_PER_KB.set(response.low_fee_per_kb as i64);
+        HEIGHT.set(response.height as i64);
+    }
 }

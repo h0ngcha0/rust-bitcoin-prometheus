@@ -23,6 +23,7 @@ lazy_static! {
     ).unwrap();
 }
 
+// https://www.blockcypher.com/dev/bitcoin/#blockchain
 #[derive(Serialize, Deserialize, Debug)]
 pub struct BlockCypherBitcoinChainResponse {
     pub name: String,
@@ -39,24 +40,46 @@ pub struct BlockCypherBitcoinChainResponse {
     pub last_fork_height: u32
 }
 
+// https://www.blockcypher.com/dev/bitcoin/#block
+#[derive(Serialize, Deserialize, Debug)]
+pub struct BlockCypherBlockResponse {
+    pub hash: String,
+    pub height: u32,
+    pub total: u64,    // total number of value transacted in this block (in satoshi)
+    pub fee: u64,      // total number of fee in this block (in satoshi)
+    pub size: u64,
+    pub n_tx: u32,
+    pub bits: u64
+}
+
 pub struct BitcoinChainGeneralInfo {}
 
 impl super::PrometheusMetrics for BitcoinChainGeneralInfo {
     fn set_metrics(&self) -> () {
-        let response: BlockCypherBitcoinChainResponse = reqwest::Client::builder()
+        let client = reqwest::Client::builder()
             .danger_accept_invalid_certs(true)
             .build()
-            .unwrap()
+            .unwrap();
+
+        let chain_response: BlockCypherBitcoinChainResponse = client
             .get("https://api.blockcypher.com/v1/btc/main")
             .send()
             .unwrap()
             .json()
             .unwrap();
 
-        info!("BlockCypher response {:?}", response);
+        info!("BlockCypher chain response {:?}", chain_response);
 
-        UNCONFIRMED_COUNT_GAUGE.set(response.unconfirmed_count as i64);
-        LOW_FEE_PER_KB.set(response.low_fee_per_kb as i64);
-        HEIGHT.set(response.height as i64);
+        UNCONFIRMED_COUNT_GAUGE.set(chain_response.unconfirmed_count as i64);
+        LOW_FEE_PER_KB.set(chain_response.low_fee_per_kb as i64);
+        HEIGHT.set(chain_response.height as i64);
+
+        let niux: String = format!("https://api.blockcypher.com/v1/btc/main/blocks/{}", chain_response.hash);
+        let block_response: BlockCypherBlockResponse = client
+            .get(niux)
+            .send()
+            .unwrap()
+            .json()
+            .unwrap();
     }
 }

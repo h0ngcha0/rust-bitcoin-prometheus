@@ -21,8 +21,33 @@ lazy_static! {
         "bitcoin_block_height",
         "The current height of the blockchain; i.e., the number of blocks in the blockchain"
     ).unwrap();
+
+    pub static ref BLOCK_SIZE: IntGauge = register_int_gauge!(
+        "bitcoin_block_size",
+        concat!(
+            "Raw size of block (including header and all transactions) in bytes.",
+            " Not returned for bitcoin blocks earlier than height 389104"
+        )
+
+    ).unwrap();
+
+    pub static ref BLOCK_TOTAL_VALUE_TRANSACTED: IntGauge = register_int_gauge!(
+        "bitcoin_block_total_value_transacted",
+        "The total number of satoshis transacted in this block"
+    ).unwrap();
+
+    pub static ref BLOCK_TOTAL_FEE: IntGauge = register_int_gauge!(
+        "bitcoin_block_total_fee",
+        "The total number of fees—in satoshis—collected by miners in this block"
+    ).unwrap();
+
+    pub static ref BLOCK_NUMBER_TRANSACTIONS: IntGauge = register_int_gauge!(
+        "bitcoin_block_number_of_transactions",
+        "Number of transactions in this block"
+    ).unwrap();
 }
 
+// https://www.blockcypher.com/dev/bitcoin/#blockchain
 #[derive(Serialize, Deserialize, Debug)]
 pub struct BlockCypherBitcoinChainResponse {
     pub name: String,
@@ -32,31 +57,59 @@ pub struct BlockCypherBitcoinChainResponse {
     pub latest_url: String,
     pub previous_hash: String,
     pub previous_url: String,
-    pub unconfirmed_count: u32,
-    pub high_fee_per_kb: u32,
-    pub medium_fee_per_kb: u32,
-    pub low_fee_per_kb: u32,
-    pub last_fork_height: u32
+    pub unconfirmed_count: u64,
+    pub high_fee_per_kb: u64,
+    pub medium_fee_per_kb: u64,
+    pub low_fee_per_kb: u64,
+    pub last_fork_height: u64
+}
+
+// https://www.blockcypher.com/dev/bitcoin/#block
+#[derive(Serialize, Deserialize, Debug)]
+pub struct BlockCypherBlockResponse {
+    pub hash: String,
+    pub height: u64,
+    pub total: u64,    // total number of value transacted in this block (in satoshi)
+    pub fees: u64,     // total number of fee in this block (in satoshi)
+    pub size: u64,
+    pub n_tx: u64,
+    pub bits: u64
 }
 
 pub struct BitcoinChainGeneralInfo {}
 
 impl super::PrometheusMetrics for BitcoinChainGeneralInfo {
     fn set_metrics(&self) -> () {
-        let response: BlockCypherBitcoinChainResponse = reqwest::Client::builder()
+        let client = reqwest::Client::builder()
             .danger_accept_invalid_certs(true)
             .build()
-            .unwrap()
+            .unwrap();
+
+        let chain_response: BlockCypherBitcoinChainResponse = client
             .get("https://api.blockcypher.com/v1/btc/main")
             .send()
             .unwrap()
             .json()
             .unwrap();
 
-        info!("BlockCypher response {:?}", response);
+        info!("BlockCypher chain response {:?}", chain_response);
 
-        UNCONFIRMED_COUNT_GAUGE.set(response.unconfirmed_count as i64);
-        LOW_FEE_PER_KB.set(response.low_fee_per_kb as i64);
-        HEIGHT.set(response.height as i64);
+        UNCONFIRMED_COUNT_GAUGE.set(chain_response.unconfirmed_count as i64);
+        LOW_FEE_PER_KB.set(chain_response.low_fee_per_kb as i64);
+        HEIGHT.set(chain_response.height as i64);
+
+        let block_response: BlockCypherBlockResponse = client
+            .get(&format!("https://api.blockcypher.com/v1/btc/main/blocks/{}", chain_response.hash))
+            .send()
+            .unwrap()
+            .json()
+            .unwrap();
+
+        info!("BlockCypher block response {:?}", block_response);
+
+        BLOCK_SIZE.set(block_response.size as i64);
+        BLOCK_TOTAL_VALUE_TRANSACTED.set(block_response.total as i64);
+        BLOCK_TOTAL_FEE.set(block_response.fees as i64);
+        BLOCK_NUMBER_TRANSACTIONS.set(block_response.n_tx as i64)
     }
 }
